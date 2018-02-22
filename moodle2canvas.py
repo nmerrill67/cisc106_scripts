@@ -104,12 +104,12 @@ def moodle2canvas_single(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec
 	print("\nUpdated canvas csv written to: " + new_canvas_fl + "\n\n")
 
 
-def moodle2canvas_groups(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my_sections.csv", grade_col_ind=11, groups_fl="groups.csv"):
+def moodle2canvas_groups(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my_sections.csv", grade_col_ind=11, responses_fl="responses.csv", partner_col_ind=12):
 	'''
 	moodle2canvas for partner/group assignements (i.e. labs)
 	Args:
 
-	moodle_fl (default="moodle.csv") - str: the input grades file in moodle format found on the quiz server under Results -> Grades. These should be restuls from one quiz
+	moodle_fl (default="moodle.csv") - str: the input grades file in moodle format found on the quiz server under Results -> Grades. This can be all sections appended together
 
 	canvas_fl (default="grades.csv") - str: the input grades file in canvas format. This shouold contain all grades from all students in that particular section
 	
@@ -117,19 +117,22 @@ def moodle2canvas_groups(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec
 
 	grade_col_ind (default=11) - int: the column index of 'Grade/10.00'. Please change this value if it appears differently on your moodle csv
 
-	groups_fl (default=groups.csv) - str: a csv defining each group for the week. Each row should be a group, defined by a comma-separated list of each student's UD username
+	responses_fl (default=responsess.csv) - str: The csv response file downloaded from Moodle. Can be all sections appended together
+	
+	partner_col_ind - the column index of the partner question in responses_fl
 
 	Output:
 
 	</path/to/canvas_fl_name>_updated_<date>_with_<Lab/Quiz name>.csv - file: This is the file of <canvas_fl> merged with the new quiz grades from <moodle_fl> in canvas format--ready to upload after fixing the Manual entries
 	''' 
 	ids_by_username = {} # access ids by username, taken from the lab sections csv
+	username_by_id = {}
 	print('\n\nReading students in your lab section ...')
 	with open(lab_sec_fl) as fin:
 		for line in fin:
 			line_split = line.split(',')
 			ids_by_username[line_split[1].split('@')[0]] = line_split[0] 
-	
+			username_by_id[line_split[0]] = line_split[1].split('@')[0]
 	# Now that we have all the UDIDs based on udel username, we can accurately tell one student from another, and only process the grades for our lab sections 
 	# Moodle accurately provides the udel username, but not student name or UDID
 	# Canvas provides the udel username, but not the UDID, so this mapping is necessary	
@@ -156,11 +159,19 @@ def moodle2canvas_groups(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec
 
 	print("Cross-checking groups with individual submissions...")
 	groups = [] # nested list of groups
-	with open(groups_fl) as fin:
+	with open(responses_fl) as fin:
 		for line in fin:
-			groups.append([s.strip() for s in line.strip().split(',')])
+			line_split = line.strip().split(',')
+			if not line_split[0].strip() == "Surname":
+				group = [line_split[3].strip()] # Username of submitter
+				partners = line_split[partner_col_ind].strip().split(',')
+				for partner in partners:
+					if len(partner.strip()) == 9: # Make sure its not random text
+						if partner.strip() in username_by_id.keys():
+							group.append(username_by_id[partner.strip()]) # Append multiple partners if there are any
+				groups.append(group)
 
-	print("\n\nThe following students are in your lab sections, but were not found in any group listed in " + groups_fl + ", and they do not have an individual Moodle submission. Please ensure that " + groups_fl + " is correct. They will receive a zero for now.")
+	print("\n\nThe following students are in your lab sections, but were not found in any group listed in " + responses_fl + ", and they do not have an individual Moodle submission. They will receive a zero for now.")
 	print("UDID,    Username")
 	for uname in ids_by_username.keys():
 		is_in_group_i = [uname in group for group in groups]
@@ -244,7 +255,7 @@ if __name__ == '__main__':
 	default_canvas_fl = 'grades.csv'
 	default_lab_sec_fl = 'my_sections.csv'
 	default_grade_col_ind = 11
-	default_groups_fl = 'groups.csv'
+	default_response_fl = 'responses.csv'
 
 	single_parser = subparsers.add_parser('single', help='Use this for single-person assignments (i.e. Quizzes). Use `./moodle2canvas.py single -h` for specific arguments.')
 	group_parser = subparsers.add_parser('group', help='Use this for group assignments (i.e. Labs). Use `./moodle2canvas group -h for specific arguments.')
@@ -259,11 +270,11 @@ if __name__ == '__main__':
 		subparser.add_argument('--grade-col-ind','-i', dest='grade_col_ind', nargs='?', default=default_grade_col_ind, help="The column index of 'Grade/<max grade>'. Please change this value if it appears differently on your moodle csv. Default is: " + str(default_grade_col_ind), type=int)
 
 	# group parser needs the groups csv file
-	group_parser.add_argument('--groups-fl', '-g', dest='groups_fl', nargs='?', default=default_groups_fl, help='Groups csv file defining groups for this week. Each row should be a group defined by a comma-separated list of the student UD usernames (not email). Default is: ' + default_groups_fl) 
+	group_parser.add_argument('--response-fl', '-r', dest='response_fl', nargs='?', default=default_response_fl, help='The repsonse file downloaded from Moodle WITH EVERY COLUMN AFTER QUESTION 1 REMOVED. Can have multiple sections appended. Default is: ' + default_response_fl) 
 
 	args = parser.parse_args()
 	if args.subparser == 'group':
-		moodle2canvas_groups(args.moodle_fl, args.canvas_fl, args.lab_sec_fl, args.grade_col_ind, args.groups_fl)
+		moodle2canvas_groups(args.moodle_fl, args.canvas_fl, args.lab_sec_fl, args.grade_col_ind, args.response_fl)
 	else:	
 		moodle2canvas_single(args.moodle_fl, args.canvas_fl, args.lab_sec_fl, args.grade_col_ind)
 
