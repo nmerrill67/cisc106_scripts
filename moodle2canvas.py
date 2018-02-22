@@ -165,18 +165,19 @@ def moodle2canvas_groups(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec
 	for uname in ids_by_username.keys():
 		is_in_group_i = [uname in group for group in groups]
 		has_submitted = ids_by_username[uname] in all_grades.keys()
-		if not any(is_in_group_i) or not has_submitted:
+		if not any(is_in_group_i) and not has_submitted:
 			print(str(ids_by_username[uname]) + ", " + str(uname))
 			all_grades[ids_by_username[uname]] = '0.0'
-		else: # Student found, loop through the groups and assign their grades
+		elif any(is_in_group_i): # Student found, loop through the groups and assign their grades
 			# Find max group submission grade
 			group = groups[is_in_group_i.index(True)]
 			max_group_grade = '0.0'
 			for group_member_uname in group:
-				if ids_by_username[group_member_uname] in all_grades.keys():
+				if group_member_uname in ids_by_username.keys() and ids_by_username[group_member_uname] in all_grades.keys():
 					if float(all_grades[ids_by_username[group_member_uname]]) > float(max_group_grade):
 						max_group_grade = all_grades[ids_by_username[group_member_uname]]
 			all_grades[ids_by_username[uname]] = max_group_grade	
+		# Else they submitted individually
 	
 	scoreFIN = csv.reader(open(canvas_fl)) 
 	line1 = next(scoreFIN)
