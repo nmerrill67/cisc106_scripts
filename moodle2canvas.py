@@ -149,11 +149,15 @@ def moodle2canvas_groups(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec
 			else:
 				line_split=line.strip().lower().split(',')
 				udel_username = line_split[3]
-				grade = line_split[grade_col_ind]
+				grade = line_split[grade_col_ind].strip()
 				if grade == '-':
 					grade = '0.0'
 				if udel_username in ids_by_username.keys():
-					all_grades[ids_by_username[udel_username]] = grade
+					if ids_by_username[udel_username] in all_grades.keys(): # check for multiple submissions. Want the max
+						if float(all_grades[ids_by_username[udel_username]]) < float(grade):	
+							all_grades[ids_by_username[udel_username]] = grade
+					else:
+						all_grades[ids_by_username[udel_username]] = grade
 	if max_moodle_grade < 0:
 		raise ValueError("Max Moodle Grade not found! Ensure that \"Grade/<max grade>\" is in the column header of column " + grade_col_ind + ". If the column index is wrong, please pass the correct one to this function") 
 
@@ -193,6 +197,7 @@ def moodle2canvas_groups(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec
 		elif any(is_in_group_i): # Student found, loop through the groups and assign their grades
 			# Find max group submission grade
 			group = groups[is_in_group_i.index(True)]
+			print(group)
 			max_group_grade = '0.0'
 			for group_member_uname in group:
 				if group_member_uname in ids_by_username.keys() and ids_by_username[group_member_uname] in all_grades.keys():
