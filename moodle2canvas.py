@@ -170,13 +170,24 @@ def moodle2canvas_groups(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec
 						if partner.strip() in username_by_id.keys():
 							group.append(username_by_id[partner.strip()]) # Append multiple partners if there are any
 				groups.append(group)
+	
+	# The above loop will put people in groups in their own single groups as well. Lets remove those
 
-	print("\n\nThe following students are in your lab sections, but were not found in any group listed in " + responses_fl + ", and they do not have an individual Moodle submission. They will receive a zero for now.")
+	for group in groups:
+		if len(group) == 1: #Check for single person 'groups'
+			if any([group[0] in other_group and len(other_group) > 1 for other_group in groups]): # If this is a reapeat
+				groups.remove(group) # Remove the repeat single person group in this case
+
+	missing_students_log_fl_name = canvas_fl.split('.')[0] + "_missing_students.log"
+	log_fl = open(missing_students_log_fl_name, 'w')
+	log_fl.write("The following students are in your lab sections, but were not found in any group listed in " + responses_fl + ", and they do not have an individual moodle submission. they will receive a zero for now.\nUDID,     Username")
+	print("\n\nthe following students are in your lab sections, but were not found in any group listed in " + responses_fl + ", and they do not have an individual moodle submission. they will receive a zero for now.")
 	print("UDID,    Username")
 	for uname in ids_by_username.keys():
 		is_in_group_i = [uname in group for group in groups]
 		has_submitted = ids_by_username[uname] in all_grades.keys()
 		if not any(is_in_group_i) and not has_submitted:
+			log_fl.write(str(ids_by_username[uname]) + ", " + str(uname) + "\n")
 			print(str(ids_by_username[uname]) + ", " + str(uname))
 			all_grades[ids_by_username[uname]] = '0.0'
 		elif any(is_in_group_i): # Student found, loop through the groups and assign their grades
@@ -186,7 +197,9 @@ def moodle2canvas_groups(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec
 			for group_member_uname in group:
 				if group_member_uname in ids_by_username.keys() and ids_by_username[group_member_uname] in all_grades.keys():
 					if float(all_grades[ids_by_username[group_member_uname]]) > float(max_group_grade):
+					
 						max_group_grade = all_grades[ids_by_username[group_member_uname]]
+			print(max_group_grade)
 			all_grades[ids_by_username[uname]] = max_group_grade	
 		# Else they submitted individually
 	
@@ -212,6 +225,7 @@ def moodle2canvas_groups(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec
 	print('Reading Canvas file ...') 
 	print("\n\nThe following students are in your canvas lecture section, but were not found in " + lab_sec_fl + ". Please ignore if they are a TA or a test student")
 	print("UDID,    Student Name")
+	log_fl.write("\n\nThe following students are in your canvas lecture section, but were not found in " + lab_sec_fl + ". Please ignore if they are a TA or a test student.\nUDID,    Student Name")
 	new_canvas_csv = [line1] # The matrix to write to the new csv file	
 	mult = 1.0
 	pts_poss_row = True
@@ -226,6 +240,7 @@ def moodle2canvas_groups(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec
 				row[col_to_edit] = str(float(all_grades[udid])*mult) # Edit the new grade in the correct place
 			else:
 				print(str(udid) + ", " + row[0].strip())
+				log_fl.write(str(udid) + ", " + row[0].strip() + "\n")
 		new_canvas_csv.append(row)
 
 	# Now write the new file to $PWD as "<old canvas file name>_update_<date>.csv"
@@ -235,7 +250,7 @@ def moodle2canvas_groups(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec
 		new_canvas_writer.writerow(row)
 
 	print("\nUpdated canvas csv written to: " + new_canvas_fl + "\n\n")
-
+	print("All missing students written to: " + missing_students_log_fl_name)
 # Main (gets run if you run this as a script and not as a library call)
 if __name__ == '__main__':
 	'''
