@@ -3,7 +3,7 @@ import csv
 import sys
 from time import strftime
 from re import match
-
+import numpy as np
 
 def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my_sections.csv", grade_col_ind=11, responses_fl="responses.csv", partner_col_ind=12, check_groups=False):
 	'''
@@ -53,16 +53,13 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 				if udel_username in ids_by_username.keys():
 					grade = line_split[grade_col_ind].strip()
 					if grade == '-':# Check if the quiz server screwed up and didnt submit automatically, but if they actually have nothing give them a zero
-						if any([q_grade.strip() != '-' for q_grade in line_split[(grade_col_ind+1):]]): # If this is true, then they have started questions, but the overall grade was not registered by moodle
-							print(udel_username,",", ids_by_username[udel_username], "started the quiz/lab, but Moodle did not submit it automatically. Calculating their grade now...")
-							grade_float = 0.0
-							for q_grade in line_split[(grade_col_ind+1):]:
-								if q_grade.strip() != '-':
-									grade_float += float(q_grade.strip())
-							grade = str(grade_float)
-							print(udel_username,"'s grade is now ", grade)
-						else:
-							grade = '0.0'
+						print(udel_username,",", ids_by_username[udel_username], "started the quiz/lab, but Moodle did not submit it automatically. Calculating their grade now...")
+						grade_float = 0.0
+						for q_grade in line_split[(grade_col_ind+1):]:
+							if q_grade.strip() != '-':
+								grade_float += float(q_grade.strip())
+						grade = str(grade_float)
+						print(udel_username,"'s grade is now ", grade)
 					if ids_by_username[udel_username] in all_grades.keys(): # check for multiple submissions. Want the max
 						if float(all_grades[ids_by_username[udel_username]]) < float(grade):	
 							all_grades[ids_by_username[udel_username]] = grade
@@ -79,19 +76,13 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 				line_split = line.strip().split(',')
 				if not line_split[0].strip() == "Surname":
 					group = [line_split[3].strip()] # Username of submitter
-					partners = line_split[partner_col_ind].strip().split(',')
+					partners = line_split[partner_col_ind].strip().strip('\"').split(';')
 					for partner in partners:
 						if len(partner.strip()) == 9: # Make sure its not random text
 							if partner.strip() in username_by_id.keys():
 								group.append(username_by_id[partner.strip()]) # Append multiple partners if there are any
 					groups.append(group)
-		
-		# The above loop will put people in groups in their own single groups as well. Lets remove those
-
-		for group in groups:
-			if len(group) == 1: #Check for single person 'groups'
-				if any([group[0] in other_group and len(other_group) > 1 for other_group in groups]): # If this is a reapeat
-					groups.remove(group) # Remove the repeat single person group in this case
+		groups = np.array(groups) # Do this so we can use logical indexing later
 
 		missing_students_log_fl_name = canvas_fl.split('.')[0] + "_missing_students.log"
 		log_fl = open(missing_students_log_fl_name, 'w')
@@ -99,7 +90,7 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 		print(msg)
 		log_fl.write(msg)
 		for uname in ids_by_username.keys():
-			is_in_group_i = [uname in group for group in groups]
+			is_in_group_i = np.array([uname in group for group in groups])
 			has_submitted = ids_by_username[uname] in all_grades.keys()
 			if not any(is_in_group_i) and not has_submitted:
 				log_fl.write(str(ids_by_username[uname]) + ", " + str(uname) + "\n")
@@ -107,13 +98,14 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 				all_grades[ids_by_username[uname]] = '0.0'
 			elif any(is_in_group_i): # Student found, loop through the groups and assign their grades
 				# Find max group submission grade
-				group = groups[is_in_group_i.index(True)]
+				students_groups = groups[is_in_group_i] # May return multiple groups/single submissions, we want the max for each student (i.e. if they submitted alone after a group member bailed)
 				max_group_grade = '0.0'
-				for group_member_uname in group:
-					if group_member_uname in ids_by_username.keys() and ids_by_username[group_member_uname] in all_grades.keys():
-						if float(all_grades[ids_by_username[group_member_uname]]) > float(max_group_grade):
-						
-							max_group_grade = all_grades[ids_by_username[group_member_uname]]
+				for group in students_groups:
+					for group_member_uname in group:
+						if group_member_uname in ids_by_username.keys() and ids_by_username[group_member_uname] in all_grades.keys():
+							if float(all_grades[ids_by_username[group_member_uname]]) > float(max_group_grade):
+							
+								max_group_grade = all_grades[ids_by_username[group_member_uname]]
 				all_grades[ids_by_username[uname]] = max_group_grade	
 			# Else they submitted individually
 	else: # single person activity, dont look for groups
