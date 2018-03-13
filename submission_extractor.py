@@ -22,8 +22,6 @@ def main():
     lines = list(filter(lambda line: "#!#http://" in line,f.readlines()))
     f.close()
     students = [line.strip().split("#!#") for line in lines]
-    for student in students:
-        print(student[1])
     sections = [filename for filename in os.listdir() if filename.endswith("L.csv")]
     print('Detected lab section files:')
     print(sections)
