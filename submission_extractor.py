@@ -7,7 +7,7 @@ import os
 # Step 2) Update the following code to reflect the question number of the question to be reviewed.
 # Step 3) Run the following code in console:
 """
-var question_number = "2" //MODIFY THIS LINE ONLY!
+var question_number = "12" //MODIFY THIS LINE ONLY!
 var cusid_ele = document.getElementsByClassName('reviewlink');
 for (var i = 0; i < cusid_ele.length; ++i) {
     var student_html = cusid_ele[i]; 
