@@ -7,11 +7,11 @@ import os
 # Step 2) Update the following code to reflect the question number of the question to be reviewed.
 # Step 3) Run the following code in console:
 """
-var question_number = "12" //MODIFY THIS LINE ONLY!
+var question_number = "2" //MODIFY THIS LINE ONLY!
 var cusid_ele = document.getElementsByClassName('reviewlink');
 for (var i = 0; i < cusid_ele.length; ++i) {
     var student_html = cusid_ele[i]; 
-    console.log(student_html.parentElement.getElementsByTagName("a")[0].innerHTML + "#!#"+ student_html.parentElement.parentElement.getElementsByTagName("td")[3].innerHTML + "#!#" + student_html.href.replace("review.php","comment.php") + "&slot=" + question_number);
+    console.log(student_html.parentElement.getElementsByTagName("a")[0].innerHTML + "#!#"+ student_html.parentElement.parentElement.getElementsByTagName("td")[4].innerHTML + "#!#" + student_html.href.replace("review.php","comment.php") + "&slot=" + question_number);
 }
 """
 # Step 4) Right click the console and save as submissions.log, update this directory
@@ -22,7 +22,10 @@ def main():
     lines = list(filter(lambda line: "#!#http://" in line,f.readlines()))
     f.close()
     students = [line.strip().split("#!#") for line in lines]
+    for student in students:
+        print(student[1])
     sections = [filename for filename in os.listdir() if filename.endswith("L.csv")]
+    print('Detected lab section files:')
     print(sections)
 
     for section_filename in sections:
@@ -36,6 +39,7 @@ def main():
 
         f.write("</body>\n</html>")
         f.close()
-        
-main()
+
+if __name__ == '__main__':        
+	main()
 
