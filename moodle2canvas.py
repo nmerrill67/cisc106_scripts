@@ -5,6 +5,12 @@ from time import strftime
 from re import match
 import numpy as np
 
+class bcolors:
+	YELLOW = '\033[93m'
+	GREEN = '\033[0;92m'
+	RED = '\033[91m'
+	ENDC = '\033[0m'
+
 def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my_sections.csv", grade_col_ind=11, responses_fl="responses.csv", partner_col_ind=12, check_groups=False):
 	'''
 	moodle2canvas for partner/group assignements (i.e. labs)
@@ -28,7 +34,7 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 	''' 
 	ids_by_username = {} # access ids by username, taken from the lab sections csv
 	username_by_id = {}
-	print('\n\nReading students in your lab section ...')
+	print(bcolors.GREEN, '\n\nReading students in your lab section ...', bcolors.ENDC)
 	with open(lab_sec_fl) as fin:
 		for line in fin:
 			line_split = line.split(',')
@@ -41,7 +47,7 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 	
 
 	all_grades={}
-	print('Reading Moodle submissions ...')
+	print(bcolors.GREEN, 'Reading Moodle submissions ...', bcolors.ENDC)
 	max_moodle_grade = -1
 	with open(moodle_fl) as fin:
 		for line in fin:
@@ -52,24 +58,27 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 				udel_username = line_split[3]
 				if udel_username in ids_by_username.keys():
 					grade = line_split[grade_col_ind].strip()
-					if grade == '-':# Check if the quiz server screwed up and didnt submit automatically, but if they actually have nothing give them a zero
-						print(udel_username,",", ids_by_username[udel_username], "started the quiz/lab, but Moodle did not submit it automatically. Calculating their grade now...")
-						grade_float = 0.0
-						for q_grade in line_split[(grade_col_ind+1):]:
-							if q_grade.strip() != '-':
-								grade_float += float(q_grade.strip())
-						grade = str(grade_float)
-						print(udel_username,"'s grade is now ", grade)
-					if ids_by_username[udel_username] in all_grades.keys(): # check for multiple submissions. Want the max
-						if float(all_grades[ids_by_username[udel_username]]) < float(grade):	
+					if 'not yet graded' not in grade.lower():
+						if grade == '-':# Check if the quiz server screwed up and didnt submit automatically, but if they actually have nothing give them a zero
+							print(bcolors.YELLOW, udel_username,",", ids_by_username[udel_username], "started the quiz/lab, but Moodle did not submit it automatically. Calculating their grade now...", bcolors.ENDC)
+							grade_float = 0.0
+							for q_grade in line_split[(grade_col_ind+1):]:
+								if q_grade.strip() != '-':
+									grade_float += float(q_grade.strip())
+							grade = str(grade_float)
+							print(bcolors.GREEN, udel_username,"'s grade is now ", grade, bcolors.ENDC)
+						if ids_by_username[udel_username] in all_grades.keys(): # check for multiple submissions. Want the max
+							if float(all_grades[ids_by_username[udel_username]]) < float(grade):	
+								all_grades[ids_by_username[udel_username]] = grade
+						else:
 							all_grades[ids_by_username[udel_username]] = grade
 					else:
-						all_grades[ids_by_username[udel_username]] = grade
+						print(bcolors.RED, "\n\nWARNING: ", udel_username," has a question on Moodle that has not been graded. Please ensure that they have another submission that has been graded, or grade their submission if not.\n\n", bcolors.ENDC)
 	if max_moodle_grade < 0:
 		raise ValueError("Max Moodle Grade not found! Ensure that \"Grade/<max grade>\" is in the column header of column " + grade_col_ind + ". If the column index is wrong, please pass the correct one to this function") 
 
 	if check_groups:
-		print("Cross-checking groups with individual submissions...")
+		print(bcolors.GREEN, "Cross-checking groups with individual submissions...", bcolors.ENDC)
 		groups = [] # nested list of groups
 		with open(responses_fl) as fin:
 			for line in fin:
@@ -87,7 +96,7 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 		missing_students_log_fl_name = canvas_fl.split('.')[0] + "_missing_students.log"
 		log_fl = open(missing_students_log_fl_name, 'w')
 		msg = "\n\nthe following students are in your lab sections, but were not found in any group listed in " + responses_fl + ", and they do not have an individual moodle submission. they will receive a zero for now.\nUDID,    Username\n"
-		print(msg)
+		print(bcolors.YELLOW, msg, bcolors.ENDC)
 		log_fl.write(msg)
 		for uname in ids_by_username.keys():
 			is_in_group_i = np.array([uname in group for group in groups])
@@ -112,13 +121,12 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 		msg = "\n\nThe following students are in your lab sections, but have no Moodle submission. They will receive a 0 for now.\nUDID,    Username\n"
 		missing_students_log_fl_name = canvas_fl.split('.')[0] + "_missing_students.log"
 		log_fl = open(missing_students_log_fl_name, 'w')
-		print(msg)
+		print(bcolors.YELLOW, msg, bcolors.ENDC)
 		log_fl.write(msg)
 		for uname in ids_by_username.keys():
 			if ids_by_username[uname] not in all_grades.keys():
 				print(str(ids_by_username[uname]) + ", " + str(uname))
 				all_grades[ids_by_username[uname]] = '0.0'
-
 	scoreFIN = csv.reader(open(canvas_fl)) 
 	line1 = next(scoreFIN)
 	poss_cols_to_edit = []
@@ -132,14 +140,14 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 		field_to_edit = str(input("\nPlease type the field you wish to edit (exactly).\nChoices are: " + str(poss_cols_to_edit[:]) + "\nEntry: ")) # This script is only for Quizzes and labs, so only show those cols
 		try:
 			col_to_edit = line1.index(field_to_edit)
-			print("You have chosen to edit " + field_to_edit)
+			print(bcolors.GREEN, "You have chosen to edit " + field_to_edit, bcolors.ENDC)
 			correct = True
 		except:
-			print("\nIncorrect entry. Please make sure there are no typos. You can always copy and paste")
+			print(bcolors.RED, "\nIncorrect entry. Please make sure there are no typos. You can always copy and paste", bcolors.ENDC)
 
 
-	print('Reading Canvas file ...') 
-	print("\n\nThe following students are in your canvas lecture section, but were not found in " + lab_sec_fl + ". Please ignore if they are a TA or a test student")
+	print(bcolors.GREEN, 'Reading Canvas file ...', bcolors.ENDC) 
+	print(bcolors.YELLOW, "\n\nThe following students are in your canvas lecture section, but were not found in " + lab_sec_fl + ". Please ignore if they are a TA or a test student", bcolors.ENDC)
 	print("UDID,    Student Name")
 	log_fl.write("\n\nThe following students are in your canvas lecture section, but were not found in " + lab_sec_fl + ". Please ignore if they are a TA or a test student.\nUDID,    Student Name")
 	new_canvas_csv = [line1] # The matrix to write to the new csv file	
@@ -167,8 +175,8 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 	for row in new_canvas_csv:
 		new_canvas_writer.writerow(row)
 
-	print("\nUpdated canvas csv written to: " + new_canvas_fl + "\n\n")
-	print("All missing students written to: " + missing_students_log_fl_name)
+	print(bcolors.GREEN, "\nUpdated canvas csv written to: " + new_canvas_fl + "\n\n", bcolors.ENDC)
+	print(bcolors.YELLOW, "All missing students written to: " + missing_students_log_fl_name, bcolors.ENDC)
 # Main (gets run if you run this as a script and not as a library call)
 if __name__ == '__main__':
 	'''
@@ -176,7 +184,7 @@ if __name__ == '__main__':
 	$ python moodle2canvas_style.py -mf <moodle file name>
 	OR
 	$ ./moodle2canvas_style.py -mf <moodle file name>
-	if on linux (must have /usr/bin/env 
+	if on linux (must have /usr/bin/env)
 	'''
 
 	from argparse import ArgumentParser
