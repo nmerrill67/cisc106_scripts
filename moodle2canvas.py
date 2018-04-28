@@ -131,7 +131,7 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 	line1 = next(scoreFIN)
 	poss_cols_to_edit = []
 	for col in line1:
-		if match("Quiz [0-9]", col)!=None or match("Lab [0-9]", col)!=None or match("Project [0-9]", col)!=None:
+		if match("Quiz [0-9]", col)!=None or match("Lab [0-9]", col)!=None or match(".*Project [0-9]", col)!=None:
 			poss_cols_to_edit.append(col)
 
 	correct = False
