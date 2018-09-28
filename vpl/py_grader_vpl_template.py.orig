@@ -76,7 +76,7 @@ def assertEqualAndGrade(x,y, message="", pts=0):
     """
     Assert that x and y are equal. If equal, pts is added to the grade with the grade() API.
     If not, then message is commented to the student.
-    
+	
     """
 
 
@@ -113,7 +113,7 @@ def assertEqualAndGrade(x,y, message="", pts=0):
 
         testClassRef.assertEqual(x,y, message)
 
-        if x == y:    
+        if x == y:	
 
             points += pts
 
@@ -160,7 +160,7 @@ def assertEqualAndGrade(x,y, message="", pts=0):
 
         testClassRef.assertEqual(x,y, message)
 
-        if x == y:    
+        if x == y:	
 
             points += pts
 
