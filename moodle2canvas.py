@@ -24,11 +24,11 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 
     grade_col_ind (default=7) - int: the column index of the start of grades.
 
-    responses_fl (default=responsess.csv) - str: The csv response file downloaded from Moodle. Can be all sections appended together
+    responses_fl (default=responsess.csv) - str: The csv response file downloaded from Moodle. Can be all sections appended together. Only needed if check_groups is True
     
     partner_col_ind - the column index of the partner question in responses_fl
 
-        max_moodle_grade - the max grade on Moodle. Used to determine a ratio between the max moodle grade and max Canvas grade. if -1, max grades are assumed to be the same between Canvas and Moodle.
+    max_moodle_grade - the max grade on Moodle. Used to determine a ratio between the max moodle grade and max Canvas grade. if -1, max grades are assumed to be the same between Canvas and Moodle.
 
     Output:
 
@@ -50,7 +50,7 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 
     all_grades={}
     print(bcolors.GREEN, 'Reading Moodle submissions ...', bcolors.ENDC)
-        first_line = True
+    first_line = True
     with open(moodle_fl) as fin:
         for line in fin:
             if first_line:
@@ -59,22 +59,23 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
                 line_split = line.strip().lower().split(',')
                 udel_username = line_split[0] # Get udel username 
                 if udel_username in ids_by_username.keys():
-                    if 'not yet graded' not in grade.lower():
-                        grade_float = 0.0
-                        for part_grade in line_split[grade_col_ind:-1]: # Skip last col. It's junk with no grades
-                            if part_grade.strip() != '-':# Part not completed. Add a sparse 0 (AKA do nothing)
-                                grade_float += float(part_grade.strip())
-                        grade = str(grade_float)
-                        
-                        if ids_by_username[udel_username] in all_grades.keys(): # check for multiple submissions. Want the max
-                            if float(all_grades[ids_by_username[udel_username]]) < float(grade):    
-                                all_grades[ids_by_username[udel_username]] = grade
-                        else:
+                    #if 'not yet graded' not in grade.lower():
+                    grade_float = 0.0
+                    for part_grade in line_split[grade_col_ind:-1]: # Skip last col. It's junk with no grades
+                        if part_grade.strip() != '-':# Part not completed. Add a sparse 0 (AKA do nothing)
+                            grade_float += float(part_grade.strip())
+                    grade = str(grade_float)
+                    
+                    if ids_by_username[udel_username] in all_grades.keys(): # check for multiple submissions. Want the max
+                        if float(all_grades[ids_by_username[udel_username]]) < float(grade):    
                             all_grades[ids_by_username[udel_username]] = grade
                     else:
-                        print(bcolors.RED, "\n\nWARNING: ", udel_username," has a question on Moodle that has not been graded. Please ensure that they have another submission that has been graded, or grade their submission if not.\n\n", bcolors.ENDC)
+                        all_grades[ids_by_username[udel_username]] = grade
+                    #else:
+                    #    print(bcolors.RED, "\n\nWARNING: ", udel_username," has a question on Moodle that has not been graded. Please ensure that they have another submission that has been graded, or grade their submission if not.\n\n", bcolors.ENDC)
 
     if check_groups:
+        # TODO Fix this part for new format
         print(bcolors.GREEN, "Cross-checking groups with individual submissions...", bcolors.ENDC)
         groups = [] # nested list of groups
         with open(responses_fl) as fin:
@@ -152,13 +153,14 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
     while not pts_poss_row: # Find the row with the max number of canvas points
         line = next(scoreFIN) # go to next row
         new_canvas_csv.append(line)
+        print(line[0])
         if "Points Possible" in line[0].strip():
             pts_poss_row = True
-        if max_moodle_grade > -1:
-        max_canvas_grade = float(line[col_to_edit].strip()) # Adjust the grade according to the max grade ratio
-        mult = max_canvas_grade / max_moodle_grade
-        else:
-            mult = 1
+            if max_moodle_grade > -1:
+                max_canvas_grade = float(line[col_to_edit].strip()) # Adjust the grade according to the max grade ratio
+                mult = max_canvas_grade / max_moodle_grade
+            else:
+                mult = 1
 
     for row in scoreFIN:
         udid = row[2].strip() # extract udid from canvas file line
@@ -195,7 +197,7 @@ if __name__ == '__main__':
     default_moodle_fl = 'moodle.csv'
     default_canvas_fl = 'grades.csv'
     default_lab_sec_fl = 'my_sections.csv'
-    default_grade_col_ind = 11
+    default_grade_col_ind = 7
     default_response_fl = 'responses.csv'
 
     single_parser = subparsers.add_parser('single', help='Use this for single-person assignments (i.e. Quizzes). Use `./moodle2canvas.py single -h` for specific arguments.')
@@ -212,10 +214,12 @@ if __name__ == '__main__':
 
         subparser.add_argument('--response-fl', '-r', dest='response_fl', nargs='?', default=default_response_fl, help='The repsonse file downloaded from Moodle WITH EVERY COLUMN AFTER QUESTION 1 REMOVED. Can have multiple sections appended. Default is: ' + default_response_fl) 
 
+        subparser.add_argument('--max-moodle-grade', '-g', dest='max_moodle_grade', nargs='?', default=-1, help='Max grade on Moodle. If left to default, grade scales on Moodle are assumed to be the same as Canvas', type=float) 
+
     args = parser.parse_args()
     main_check_groups = False
     if args.subparser == 'group':
         main_check_groups = True    
-    moodle2canvas(args.moodle_fl, args.canvas_fl, args.lab_sec_fl, args.grade_col_ind, args.response_fl, check_groups=main_check_groups)
+    moodle2canvas(args.moodle_fl, args.canvas_fl, args.lab_sec_fl, args.grade_col_ind, args.response_fl, check_groups=main_check_groups, max_moodle_grade=args.max_moodle_grade)
 
 
