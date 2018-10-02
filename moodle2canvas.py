@@ -133,6 +133,7 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
         log_fl.write(msg)
         for uname in ids_by_username.keys():
             if ids_by_username[uname] not in all_grades.keys():
+                log_fl.write(str(ids_by_username[uname]) + ", " + str(uname) + "\n")
                 print(str(ids_by_username[uname]) + ", " + str(uname))
                 all_grades[ids_by_username[uname]] = '0.0'
     scoreFIN = csv.reader(open(canvas_fl)) 
