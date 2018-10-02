@@ -11,7 +11,8 @@ class bcolors:
     RED = '\033[91m'
     ENDC = '\033[0m'
 
-def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my_sections.csv", grade_col_ind=7, responses_fl="responses.csv", partner_col_ind=12, check_groups=False, max_moodle_grade=-1):
+def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my_sections.csv", grade_col_ind=7,
+         responses_fl="responses.csv", partner_col_ind=12, check_groups=False, max_moodle_grade=-1, style="vpl"):
     '''
     moodle2canvas for partner/group assignements (i.e. labs)
     Args:
@@ -29,6 +30,9 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
     partner_col_ind - the column index of the partner question in responses_fl
 
     max_moodle_grade - the max grade on Moodle. Used to determine a ratio between the max moodle grade and max Canvas grade. if -1, max grades are assumed to be the same between Canvas and Moodle.
+
+    style - string "vpl" or "quiz". If vpl, the spreadsheet is assumed to be in VPL exported format: grades are summed from grade_col_ind to the second to last column, which contains download info.
+                        if quiz, the spreadsheet is assumed to be in coderunner/essay format, where the total grade is in column grade_col_ind, and no summation is performed.
 
     Output:
 
@@ -57,22 +61,28 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
                 first_line = False # skip
             else:
                 line_split = line.strip().lower().split(',')
-                udel_username = line_split[0] # Get udel username 
+                if style.lower() == "vpl":
+                    udel_username = line_split[0] # Get udel username 
+                elif style.lower() == "quiz":
+                    udel_username = line_split[3]
+                else:
+                    raise ValueError("Unkown style: " + style.lower())
+
                 if udel_username in ids_by_username.keys():
-                    #if 'not yet graded' not in grade.lower():
-                    grade_float = 0.0
-                    for part_grade in line_split[grade_col_ind:-1]: # Skip last col. It's junk with no grades
-                        if part_grade.strip() != '-':# Part not completed. Add a sparse 0 (AKA do nothing)
-                            grade_float += float(part_grade.strip())
-                    grade = str(grade_float)
-                    
+                    if style.lower() == "vpl":
+                        grade_float = 0.0
+                        for part_grade in line_split[grade_col_ind:-1]: # Skip last col. It's junk with no grades
+                            if part_grade.strip() != '-':# Part not completed. Add a sparse 0 (AKA do nothing)
+                                grade_float += float(part_grade.strip())
+                        grade = str(grade_float)
+                    else:
+                        grade = line_split[grade_col_ind]
+
                     if ids_by_username[udel_username] in all_grades.keys(): # check for multiple submissions. Want the max
                         if float(all_grades[ids_by_username[udel_username]]) < float(grade):    
                             all_grades[ids_by_username[udel_username]] = grade
                     else:
                         all_grades[ids_by_username[udel_username]] = grade
-                    #else:
-                    #    print(bcolors.RED, "\n\nWARNING: ", udel_username," has a question on Moodle that has not been graded. Please ensure that they have another submission that has been graded, or grade their submission if not.\n\n", bcolors.ENDC)
 
     if check_groups:
         # TODO Fix this part for new format
@@ -161,6 +171,7 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
                 mult = max_canvas_grade / max_moodle_grade
             else:
                 mult = 1
+            line = next(scoreFIN) # Go past Points Possible row
 
     for row in scoreFIN:
         udid = row[2].strip() # extract udid from canvas file line
@@ -213,6 +224,8 @@ if __name__ == '__main__':
         subparser.add_argument('--grade-col-ind','-i', dest='grade_col_ind', nargs='?', default=default_grade_col_ind, help="The column index of 'Grade/<max grade>'. Please change this value if it appears differently on your moodle csv. Default is: " + str(default_grade_col_ind), type=int)
 
         subparser.add_argument('--response-fl', '-r', dest='response_fl', nargs='?', default=default_response_fl, help='The repsonse file downloaded from Moodle WITH EVERY COLUMN AFTER QUESTION 1 REMOVED. Can have multiple sections appended. Default is: ' + default_response_fl) 
+        
+        subparser.add_argument('--style', '-s', dest='style', nargs='?', default="vpl", help='"vpl" or "quiz". If vpl, the spreadsheet is assumed to be in VPL exported format: grades are summed from grade_col_ind to the second to last column, which contains download info.if quiz, the spreadsheet is assumed to be in coderunner/essay format, where the total grade is in column grade_col_ind, and no summation is performed.') 
 
         subparser.add_argument('--max-moodle-grade', '-g', dest='max_moodle_grade', nargs='?', default=-1, help='Max grade on Moodle. If left to default, grade scales on Moodle are assumed to be the same as Canvas', type=float) 
 
@@ -220,6 +233,6 @@ if __name__ == '__main__':
     main_check_groups = False
     if args.subparser == 'group':
         main_check_groups = True    
-    moodle2canvas(args.moodle_fl, args.canvas_fl, args.lab_sec_fl, args.grade_col_ind, args.response_fl, check_groups=main_check_groups, max_moodle_grade=args.max_moodle_grade)
+    moodle2canvas(args.moodle_fl, args.canvas_fl, args.lab_sec_fl, args.grade_col_ind, args.response_fl, check_groups=main_check_groups, max_moodle_grade=args.max_moodle_grade, style=args.style)
 
 
