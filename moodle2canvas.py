@@ -70,17 +70,24 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 
                 if udel_username in ids_by_username.keys():
                     if style.lower() == "vpl":
-                        grade_float = 0.0
+                        grade_list = []
+                        n_parts = len(line_split[grade_col_ind:-1])
                         for part_grade in line_split[grade_col_ind:-1]: # Skip last col. It's junk with no grades
-                            if part_grade.strip() != '-':# Part not completed. Add a sparse 0 (AKA do nothing)
-                                grade_float += float(part_grade.strip())
-                        grade = str(grade_float)
+                            if part_grade.strip() != '-':# if Part completed.
+                                grade_list.append(float(part_grade.strip()))
+                            else:
+                                grade_list.append(0)
+                        grade = np.array(grade_list)
                     else:
-                        grade = line_split[grade_col_ind]
+                        grade = line_split[grade_col_ind] # Just a string for this style
 
                     if ids_by_username[udel_username] in all_grades.keys(): # check for multiple submissions. Want the max
-                        if float(all_grades[ids_by_username[udel_username]]) < float(grade):    
-                            all_grades[ids_by_username[udel_username]] = grade
+                        if style == 'quiz':
+                            if float(all_grades[ids_by_username[udel_username]]) < float(grade):    
+                                all_grades[ids_by_username[udel_username]] = grade
+                        else:
+                            # Element-wise max for each part of the lab
+                            all_grades[ids_by_username[udel_username]] = np.maximum(all_grades[ids_by_username[udel_username]], grade)
                     else:
                         all_grades[ids_by_username[udel_username]] = grade
 
@@ -116,13 +123,19 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
             elif any(is_in_group_i): # Student found, loop through the groups and assign their grades
                 # Find max group submission grade
                 students_groups = groups[is_in_group_i] # May return multiple groups/single submissions, we want the max for each student (i.e. if they submitted alone after a group member bailed)
-                max_group_grade = '0.0'
+                max_group_grade = '0.0' if style=='quiz' else np.zeros((n_parts))
                 for group in students_groups:
                     for group_member_uname in group:
                         if group_member_uname in ids_by_username.keys() and ids_by_username[group_member_uname] in all_grades.keys():
-                            if float(all_grades[ids_by_username[group_member_uname]]) > float(max_group_grade):
-                            
-                                max_group_grade = all_grades[ids_by_username[group_member_uname]]
+                            if style == 'quiz':  
+                                if float(all_grades[ids_by_username[group_member_uname]]) > float(max_group_grade):
+                                
+                                    max_group_grade = all_grades[ids_by_username[group_member_uname]]
+                            else:
+                                # element-wise max across parts of the lab in case partners
+                                # took turns using different accounts
+                                max_group_grade = np.maximum(max_group_grade, all_grades[ids_by_username[group_member_uname]])
+
                 all_grades[ids_by_username[uname]] = max_group_grade    
             # Else they submitted individually
     else: # single person activity, dont look for groups
@@ -135,7 +148,7 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
             if ids_by_username[uname] not in all_grades.keys():
                 log_fl.write(str(ids_by_username[uname]) + ", " + str(uname) + "\n")
                 print(str(ids_by_username[uname]) + ", " + str(uname))
-                all_grades[ids_by_username[uname]] = '0.0'
+                all_grades[ids_by_username[uname]] = '0.0' if style=='quiz' else np.zeros((n_parts))
     scoreFIN = csv.reader(open(canvas_fl)) 
     line1 = next(scoreFIN)
     poss_cols_to_edit = []
@@ -177,7 +190,10 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
     for row in scoreFIN:
         udid = row[2].strip() # extract udid from canvas file line
         if udid in all_grades.keys(): # first check if in our lab section,  then check is in this current canvas section (because we have three different canvas pages for three different sections of the same class for some reason)
-            row[col_to_edit] = str(float(all_grades[udid])*mult) # Edit the new grade in the correct place
+            if style == 'quiz':
+                row[col_to_edit] = str(float(all_grades[udid])*mult) # Edit the new grade in the correct place
+            else:
+                row[col_to_edit] = str( np.sum(all_grades[udid]) * mult ) # Edit the new grade in the correct place
         else:
             print(str(udid) + ", " + row[0].strip())
             log_fl.write(str(udid) + ", " + row[0].strip() + "\n")
@@ -226,7 +242,7 @@ if __name__ == '__main__':
 
         subparser.add_argument('--response-fl', '-r', dest='response_fl', nargs='?', default=default_response_fl, help='The repsonse file downloaded from Moodle WITH EVERY COLUMN AFTER QUESTION 1 REMOVED. Can have multiple sections appended. Default is: ' + default_response_fl) 
         
-        subparser.add_argument('--style', '-s', dest='style', nargs='?', default="vpl", help='"vpl" or "quiz". If vpl, the spreadsheet is assumed to be in VPL exported format: grades are summed from grade_col_ind to the second to last column, which contains download info.if quiz, the spreadsheet is assumed to be in coderunner/essay format, where the total grade is in column grade_col_ind, and no summation is performed.') 
+        subparser.add_argument('--style', '-s', dest='style', nargs='?', default="vpl", help='"vpl" or "quiz". If vpl, the spreadsheet is assumed to be in VPL exported format: grades are summed from grade_col_ind to the second to last column, which contains download info.if quiz, the spreadsheet is assumed to be in coderunner/essay format, where the total grade is in column grade_col_ind, and no summation is performed. Default is vpl') 
 
         subparser.add_argument('--max-moodle-grade', '-g', dest='max_moodle_grade', nargs='?', default=-1, help='Max grade on Moodle. If left to default, grade scales on Moodle are assumed to be the same as Canvas', type=float) 
 
