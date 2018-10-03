@@ -92,7 +92,7 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
                         all_grades[ids_by_username[udel_username]] = grade
 
     if check_groups:
-        # TODO Fix this part for new format
+        # TODO Fix this part for new format (with emails or NONE)
         print(bcolors.GREEN, "Cross-checking groups with individual submissions...", bcolors.ENDC)
         groups = [] # nested list of groups
         with open(responses_fl) as fin:
