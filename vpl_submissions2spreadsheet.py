@@ -26,18 +26,20 @@ def vpl_submissions2spreadsheet(input_dir, output_fl, lab_fl_name, lab_sec_fl , 
             for sub_dir in os.listdir(path): # Get newest submission dir
                 if not sub_dir.endswith('.ceg'):
                     newest = max(newest, sub_dir) # The dirs are dates. This works just fine
-            full_path = os.path.join(path, newest, lab_fl_name)
-            with open(full_path) as fp:
-                lines = fp.read().split('\n')[:-1]
-            partner = '-'
-            for line in lines:
-                if 'Partner UDID:' in line:
-                    partner_ = line.split(':')[1].strip() 
-                    if len(partner_) == 9: # Check its valid      
-                        partner = partner_
-                        break
-            ss_line += partner + "\n"
-            flstr += ss_line
+            if newest != "": # Else they have no submissions at all
+                full_path = os.path.join(path, newest, lab_fl_name)
+                with open(full_path) as fp:
+                    lines = fp.read().split('\n')[:-1]
+                partner = '-'
+                for line in lines:
+                    if 'Partner UDID:' in line:
+                        partner_ = line.split(':')[1].strip() 
+                        if len(partner_) == 9: # Check its valid      
+                            partner = partner_
+                            break
+                ss_line += partner + "\n"
+                flstr += ss_line
+                
         else:
             print("Student", name[:-1], "not found in section") 
     with open(output_fl, 'w') as fp:

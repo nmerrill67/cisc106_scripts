@@ -185,7 +185,6 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
                 mult = max_canvas_grade / max_moodle_grade
             else:
                 mult = 1
-            line = next(scoreFIN) # Go past Points Possible row
 
     for row in scoreFIN:
         udid = row[2].strip() # extract udid from canvas file line
