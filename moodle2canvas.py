@@ -102,9 +102,10 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
                     group = [line_split[3].strip()] # Username of submitter
                     partners = line_split[partner_col_ind].strip().strip('\"').split(';')
                     for partner in partners:
-                        if len(partner.strip()) == 9: # Make sure its not random text
-                            if partner.strip() in username_by_id.keys():
-                                group.append(username_by_id[partner.strip()]) # Append multiple partners if there are any
+                        if partner.strip().endswith('@udel.edu'): # Make sure its not random text
+                            partner_uname = partner.strip().split('@')[0].lower()
+                            if partner_uname in ids_by_username.keys():
+                                group.append(partner_uname) # Append multiple partners if there are any
                     groups.append(group)
         groups = np.array(groups) # Do this so we can use logical indexing later
 
