@@ -4,14 +4,14 @@ import sys
 from time import strftime
 from re import match
 import numpy as np
-    
+
 class bcolors:
     YELLOW = '\033[93m'
     GREEN = '\033[0;92m'
     RED = '\033[91m'
     ENDC = '\033[0m'
 
-def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my_sections.csv", grade_col_ind=7,
+def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my_sections.csv", 
          responses_fl="responses.csv", partner_col_ind=12, check_groups=False, max_moodle_grade=-1, style="vpl"):
     '''
     moodle2canvas for partner/group assignements (i.e. labs)
@@ -22,8 +22,6 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
     canvas_fl (default="grades.csv") - str: the input grades file in canvas format. This shouold contain all grades from all students in that particular section
     
     lab_sec_fl (default="my_sections.csv") - str: a csv containing only YOUR lab sections with tho columns set up as: ID, Email. Note: this assumes that the first line starts with actual data, and not a column headear (very important)
-
-    grade_col_ind (default=7) - int: the column index of the start of grades.
 
     responses_fl (default=responsess.csv) - str: The csv response file downloaded from Moodle. Can be all sections appended together. Only needed if check_groups is True
     
@@ -38,6 +36,9 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 
     </path/to/canvas_fl_name>_updated_<date>_with_<Lab/Quiz name>.csv - file: This is the file of <canvas_fl> merged with the new quiz grades from <moodle_fl> in canvas format--ready to upload after fixing the Manual entries
     ''' 
+
+    grade_col_ind = 7 if style=='vpl' else 11
+
     ids_by_username = {} # access ids by username, taken from the lab sections csv
     username_by_id = {}
     print(bcolors.GREEN, '\n\nReading students in your section(s) ...', bcolors.ENDC)
@@ -152,21 +153,32 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
                 all_grades[ids_by_username[uname]] = '0.0' if style=='quiz' else np.zeros((n_parts))
     scoreFIN = csv.reader(open(canvas_fl)) 
     line1 = next(scoreFIN)
-    poss_cols_to_edit = []
+    poss_cols_to_edit = {}
+    poss_cols_to_edit_pretty = []
+    idx = 0
+    counter = 0
     for col in line1:
-        if match("Quiz [0-9]", col)!=None or match("Lab [0-9]", col)!=None or match(".*Project .*[0-9]", col)!=None:
-            poss_cols_to_edit.append(col)
+        if match("Quiz [0-9]", col) is not None or match("Lab [0-9]", col) is not None \
+                or match(".*Project .*[0-9]", col) is not None:
+            poss_cols_to_edit_pretty.append(col.split(' (')[0])
+            poss_cols_to_edit[str(idx)] = counter
+            idx += 1
+        counter += 1
 
     correct = False
     col_to_edit = -1
     while not correct:
-        field_to_edit = str(input("\nPlease type the field you wish to edit (exactly).\nChoices are: " + str(poss_cols_to_edit[:]) + "\nEntry: ")) # This script is only for Quizzes and labs, so only show those cols
-        try:
-            col_to_edit = line1.index(field_to_edit)
-            print(bcolors.GREEN, "You have chosen to edit " + field_to_edit, bcolors.ENDC)
+        print("\nPlease type the number corresponding to the assignment you are uploading grades for\n")
+        [print(str(i)+':', poss_cols_to_edit_pretty[i]) for i in range(len(poss_cols_to_edit_pretty))]
+        field_idx_to_edit = str(input("\nEntry (number): ")) # This script is only for Quizzes and labs, so only show those cols
+        col_to_edit = poss_cols_to_edit.get(field_idx_to_edit)
+        if col_to_edit is not None:
+            field_to_edit_pretty = poss_cols_to_edit_pretty[int(field_idx_to_edit)]
+            print(bcolors.GREEN, "You have chosen to edit " + \
+                     field_to_edit_pretty, bcolors.ENDC)
             correct = True
-        except:
-            print(bcolors.RED, "\nIncorrect entry. Please make sure there are no typos. You can always copy and paste", bcolors.ENDC)
+        else:
+            print(bcolors.RED, "\nIncorrect entry. Please make sure the number is listed", bcolors.ENDC)
 
 
     print(bcolors.GREEN, 'Reading Canvas file ...', bcolors.ENDC) 
@@ -200,7 +212,8 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
         new_canvas_csv.append(row)
 
     # Now write the new file to $PWD as "<old canvas file name>_update_<date>.csv"
-    new_canvas_fl = canvas_fl.split('.')[0] + '_updated_' + strftime("%d-%m-%Y_%I%M%S") + '_with_' + field_to_edit.split('(')[0] + '.csv'
+    new_canvas_fl = canvas_fl.split('.')[0] + '_updated_' + strftime("%d-%m-%Y_%I%M%S") + \
+            '_with_' + field_to_edit_pretty.replace(' ','') + '.csv'
     new_canvas_writer = csv.writer(open(new_canvas_fl, 'w'), delimiter=',')
     for row in new_canvas_csv:
         new_canvas_writer.writerow(row)
@@ -239,8 +252,6 @@ if __name__ == '__main__':
 
         subparser.add_argument('--lab-sec-fl','-l', dest='lab_sec_fl', nargs='?', default=default_lab_sec_fl, help='The input csv file of all your lab/lecture sections with first two columns of \'ID, Email\' (with no column headers). Other columns are ignored if they exist. Default is: ' + default_lab_sec_fl)
 
-        subparser.add_argument('--grade-col-ind','-i', dest='grade_col_ind', nargs='?', default=default_grade_col_ind, help="The 0-indexed column index of 'Grade/<max grade>' if style=='quiz', or the first column of lab part grades if style=='vpl'. Default is: " + str(default_grade_col_ind), type=int)
-
         subparser.add_argument('--response-fl', '-r', dest='response_fl', nargs='?', default=default_response_fl, help='The repsonse file downloaded from Moodle WITH EVERY COLUMN AFTER QUESTION 1 REMOVED. Can have multiple sections appended. Default is: ' + default_response_fl) 
         
         subparser.add_argument('--style', '-s', dest='style', nargs='?', default="vpl", help='"vpl" or "quiz". If vpl, the spreadsheet is assumed to be in VPL exported format: grades are summed from grade_col_ind to the second to last column, which contains download info.if quiz, the spreadsheet is assumed to be in coderunner/essay format, where the total grade is in column grade_col_ind, and no summation is performed. Default is vpl') 
@@ -251,6 +262,6 @@ if __name__ == '__main__':
     main_check_groups = False
     if args.subparser == 'group':
         main_check_groups = True    
-    moodle2canvas(args.moodle_fl, args.canvas_fl, args.lab_sec_fl, args.grade_col_ind, args.response_fl, check_groups=main_check_groups, max_moodle_grade=args.max_moodle_grade, style=args.style)
+    moodle2canvas(args.moodle_fl, args.canvas_fl, args.lab_sec_fl, args.response_fl, check_groups=main_check_groups, max_moodle_grade=args.max_moodle_grade, style=args.style)
 
 
