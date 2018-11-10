@@ -110,6 +110,8 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
                     groups.append(group)
         groups = np.array(groups) # Do this so we can use logical indexing later
 
+        print(groups)
+
         missing_students_log_fl_name = canvas_fl.split('.')[0] + "_missing_students.log"
         log_fl = open(missing_students_log_fl_name, 'w')
         msg = "\n\nthe following students are in your lab sections, but were not found in any group listed in " + responses_fl + ", and they do not have an individual moodle submission. they will receive a zero for now.\nUDID,    Username\n"
