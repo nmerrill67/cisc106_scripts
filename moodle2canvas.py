@@ -12,7 +12,8 @@ class bcolors:
     ENDC = '\033[0m'
 
 def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my_sections.csv", 
-         responses_fl="responses.csv", partner_col_ind=12, check_groups=False, max_moodle_grade=-1, style="vpl"):
+         responses_fl="responses.csv", partner_col_ind=12, check_groups=False, max_moodle_grade=-1,
+         style="vpl", grade_cutoff=None):
     '''
     moodle2canvas for partner/group assignements (i.e. labs)
     Args:
@@ -37,7 +38,22 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
     </path/to/canvas_fl_name>_updated_<date>_with_<Lab/Quiz name>.csv - file: This is the file of <canvas_fl> merged with the new quiz grades from <moodle_fl> in canvas format--ready to upload after fixing the Manual entries
     ''' 
 
+    style = style.lower()
+    assert style=='vpl' or style=='quiz', "Unrecognized style: '%s'" % style
+
     grade_col_ind = 7 if style=='vpl' else 11
+
+    if grade_cutoff is not None:
+        if style == 'vpl':
+            gc_dict = {}
+            for cutoffs in grade_cutoff.split(';'):
+                cutoff, ind = cutoffs.split(',')
+                cutoff = float(cutoff.strip())
+                ind = int(ind.strip())
+                gc_dict[ind] = cutoff
+            grade_cutoff = gc_dict
+        else:
+            grade_cutoff = float(grade_cutoff.strip())
 
     ids_by_username = {} # access ids by username, taken from the lab sections csv
     username_by_id = {}
@@ -73,15 +89,23 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
                     if style.lower() == "vpl":
                         grade_list = []
                         n_parts = len(line_split[grade_col_ind:-1])
-                        for part_grade in line_split[grade_col_ind:-1]: # Skip last col. It's junk with no grades
+                        for i in range(len(line_split[grade_col_ind:-1])): # Skip last col. It's junk with no grades
+                            part_grade = line_split[grade_col_ind:-1][i]
                             if part_grade.strip() != '-':# if Part completed.
-                                grade_list.append(float(part_grade.strip()))
+                                grade_ = float(part_grade.strip())
+                                if grade_cutoff is not None and i in grade_cutoff.keys():
+                                    grade_ = min(grade_cutoff[i], grade_)
+                                grade_list.append(grade_)
                             else:
                                 grade_list.append(0)
                         grade = np.array(grade_list)
                     else:
-                        grade = line_split[grade_col_ind] # Just a string for this style
-
+                        grade_ = line_split[grade_col_ind].strip() # Just a string for this style
+                        if grade_ == '-':
+                            grade = '0'
+                        else:
+                            grade = grade_ if grade_cutoff is None else str(min(grade_cutoff, float(grade_)))
+    
                     if ids_by_username[udel_username] in all_grades.keys(): # check for multiple submissions. Want the max
                         if style == 'quiz':
                             if float(all_grades[ids_by_username[udel_username]]) < float(grade):    
@@ -205,7 +229,7 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
             if style == 'quiz':
                 row[col_to_edit] = str(float(all_grades[udid])*mult) # Edit the new grade in the correct place
             else:
-                row[col_to_edit] = str( np.sum(all_grades[udid]) * mult ) # Edit the new grade in the correct place
+                row[col_to_edit] = str(np.sum(all_grades[udid]) * mult) # Edit the new grade in the correct place
         else:
             print(str(udid) + ", " + row[0].strip())
             log_fl.write(str(udid) + ", " + row[0].strip() + "\n")
@@ -258,10 +282,14 @@ if __name__ == '__main__':
 
         subparser.add_argument('--max-moodle-grade', '-g', dest='max_moodle_grade', nargs='?', default=-1, help='Max grade on Moodle. If left to default, grade scales on Moodle are assumed to be the same as Canvas', type=float) 
 
+        subparser.add_argument('--grade-cutoff', '-x', dest='grade_cutoff', nargs='?', default=None, help='Max grade (in Moodle scale) for the part(s) specified. Format is "(max grade 1), (offset from first grade column 1); (max grade 2), (offset from first grade column 2)..." if style==vpl or "max grade" if style==quiz') 
+
     args = parser.parse_args()
     main_check_groups = False
     if args.subparser == 'group':
         main_check_groups = True    
-    moodle2canvas(args.moodle_fl, args.canvas_fl, args.lab_sec_fl, args.response_fl, check_groups=main_check_groups, max_moodle_grade=args.max_moodle_grade, style=args.style)
+    moodle2canvas(args.moodle_fl, args.canvas_fl, args.lab_sec_fl, args.response_fl,
+         check_groups=main_check_groups, max_moodle_grade=args.max_moodle_grade,
+         style=args.style, grade_cutoff=args.grade_cutoff)
 
 
