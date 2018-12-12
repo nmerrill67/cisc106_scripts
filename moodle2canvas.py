@@ -13,7 +13,7 @@ class bcolors:
 
 def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my_sections.csv", 
          responses_fl="responses.csv", partner_col_ind=12, check_groups=False, max_moodle_grade=-1,
-         style="vpl", grade_cutoff=None):
+         style="vpl", grade_cutoff=None, add=False):
     '''
     moodle2canvas for partner/group assignements (i.e. labs)
     Args:
@@ -32,6 +32,8 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
 
     style - string "vpl" or "quiz". If vpl, the spreadsheet is assumed to be in VPL exported format: grades are summed from grade_col_ind to the second to last column, which contains download info.
                         if quiz, the spreadsheet is assumed to be in coderunner/essay format, where the total grade is in column grade_col_ind, and no summation is performed.
+
+    add - bool: if True, add the new grades to the current Canvas grade. Useful for combining multiple project parts into one canvas assignment when kids worked with different partners.
 
     Output:
 
@@ -227,9 +229,12 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
         udid = row[2].strip() # extract udid from canvas file line
         if udid in all_grades.keys(): # first check if in our lab section,  then check is in this current canvas section (because we have three different canvas pages for three different sections of the same class for some reason)
             if style == 'quiz':
-                row[col_to_edit] = str(float(all_grades[udid])*mult) # Edit the new grade in the correct place
+                new_grade = float(all_grades[udid])*mult # Edit the new grade in the correct place
             else:
-                row[col_to_edit] = str(np.sum(all_grades[udid]) * mult) # Edit the new grade in the correct place
+                new_grade = np.sum(all_grades[udid]) * mult # Edit the new grade in the correct place
+
+            row[col_to_edit] = str(new_grade) if not add else str(float(row[col_to_edit]) + new_grade)
+
         else:
             print(str(udid) + ", " + row[0].strip())
             log_fl.write(str(udid) + ", " + row[0].strip() + "\n")
@@ -283,6 +288,8 @@ if __name__ == '__main__':
         subparser.add_argument('--max-moodle-grade', '-g', dest='max_moodle_grade', nargs='?', default=-1, help='Max grade on Moodle. If left to default, grade scales on Moodle are assumed to be the same as Canvas', type=float) 
 
         subparser.add_argument('--grade-cutoff', '-x', dest='grade_cutoff', nargs='?', default=None, help='Max grade (in Moodle scale) for the part(s) specified. Format is "(max grade 1), (offset from first grade column 1); (max grade 2), (offset from first grade column 2)..." if style==vpl or "max grade" if style==quiz') 
+        
+        subparser.add_argument('--add', '-a', dest='add', nargs='?', default=False, type=bool, help='If true, grades are added to current Canvas grades for each student. Useful for combining multiplt project parts into one canvas assignment when partners may be different for different parts.') 
 
     args = parser.parse_args()
     main_check_groups = False
@@ -290,6 +297,6 @@ if __name__ == '__main__':
         main_check_groups = True    
     moodle2canvas(args.moodle_fl, args.canvas_fl, args.lab_sec_fl, args.response_fl,
          check_groups=main_check_groups, max_moodle_grade=args.max_moodle_grade,
-         style=args.style, grade_cutoff=args.grade_cutoff)
+         style=args.style, grade_cutoff=args.grade_cutoff, add=args.add)
 
 
