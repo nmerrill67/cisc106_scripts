@@ -2,7 +2,7 @@
 
 import os
 #Note:
-# Step 0) Place roster files into pwd
+# Step 0) Place roster files into pwd (file names must end in L.csv!)
 # Step 1) Login to quiz server and go to Administration Panel->Results->Responses
 # Step 2) Update the following code to reflect the question number of the question to be reviewed.
 # Step 3) Run the following code in console:
