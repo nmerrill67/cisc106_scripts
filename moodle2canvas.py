@@ -11,6 +11,25 @@ class bcolors:
     RED = '\033[91m'
     ENDC = '\033[0m'
 
+def csv_split(line):
+    ret = []
+    line_split = line.split(',')
+    curr = ''
+    quotes = ['"', "'"]
+    for _part in line_split:
+        part = _part.strip()
+        if part != '':
+            if part[0] not in quotes and curr == '':
+                ret.append(part)
+            elif part[0] in quotes:
+                curr += part + ", "
+            elif part[-1] in quotes:
+                ret.append(curr + part)
+            else:
+                curr += part + ", "
+
+    return ret
+
 def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my_sections.csv", 
          responses_fl="responses.csv", partner_col_ind=12, check_groups=False, max_moodle_grade=-1,
          style="vpl", grade_cutoff=None, add=False, lp=False):
@@ -65,9 +84,10 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
     print(bcolors.GREEN, '\n\nReading students in your section(s) ...', bcolors.ENDC)
     with open(lab_sec_fl) as fin:
         for line in fin:
-            line_split = line.split(',')
+            line_split = csv_split(line)
+            print(line_split)
             ids_by_username[line_split[1].split('@')[0]] = line_split[0] 
-            name_by_username[line_split[1].split('@')[0]] = line_split[2] + ', ' + line_split[3] 
+            name_by_username[line_split[1].split('@')[0]] = line_split[2] 
             username_by_id[line_split[0]] = line_split[1].split('@')[0]
     # Now that we have all the UDIDs based on udel username, we can accurately tell one student from another, and only process the grades for our lab sections 
     # Moodle accurately provides the udel username, but not student name or UDID
