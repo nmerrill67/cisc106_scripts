@@ -13,7 +13,7 @@ class bcolors:
 
 def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my_sections.csv", 
          responses_fl="responses.csv", partner_col_ind=12, check_groups=False, max_moodle_grade=-1,
-         style="vpl", grade_cutoff=None, add=False):
+         style="vpl", grade_cutoff=None, add=False, lp=False):
     '''
     moodle2canvas for partner/group assignements (i.e. labs)
     Args:
@@ -34,6 +34,8 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
                         if quiz, the spreadsheet is assumed to be in coderunner/essay format, where the total grade is in column grade_col_ind, and no summation is performed.
 
     add - bool: if True, add the new grades to the current Canvas grade. Useful for combining multiple project parts into one canvas assignment when kids worked with different partners.
+
+    lp - bool: If True, partners are logged in csv file in the canvas csv directory under "partners.csv"
 
     Output:
 
@@ -58,12 +60,14 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
             grade_cutoff = float(grade_cutoff.strip())
 
     ids_by_username = {} # access ids by username, taken from the lab sections csv
+    name_by_username = {} # access name by username, taken from the lab sections csv
     username_by_id = {}
     print(bcolors.GREEN, '\n\nReading students in your section(s) ...', bcolors.ENDC)
     with open(lab_sec_fl) as fin:
         for line in fin:
             line_split = line.split(',')
             ids_by_username[line_split[1].split('@')[0]] = line_split[0] 
+            name_by_username[line_split[1].split('@')[0]] = line_split[2] + ', ' + line_split[3] 
             username_by_id[line_split[0]] = line_split[1].split('@')[0]
     # Now that we have all the UDIDs based on udel username, we can accurately tell one student from another, and only process the grades for our lab sections 
     # Moodle accurately provides the udel username, but not student name or UDID
@@ -137,6 +141,23 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
         groups = np.array(groups) # Do this so we can use logical indexing later
 
         missing_students_log_fl_name = canvas_fl.split('.')[0] + "_missing_students.log"
+
+        if lp:
+
+            ws = "Submitter, Partner(s)\n"
+            for group in groups:
+                if group[0] in name_by_username.keys():
+                    ws += name_by_username[group[0]] + ','
+                    if len(group) == 1:
+                        ws += 'None'
+                    else:
+                        for partner in group[1:]:
+                            ws += name_by_username[partner]
+                    ws += ",\n"
+
+            with open(canvas_fl.split('.')[0] + "_partners.csv", 'w') as lpf:
+                lpf.write(ws)
+
         log_fl = open(missing_students_log_fl_name, 'w')
         msg = "\n\nthe following students are in your lab sections, but were not found in any group listed in " + responses_fl + ", and they do not have an individual moodle submission. they will receive a zero for now.\nUDID,    Username\n"
         print(bcolors.YELLOW, msg, bcolors.ENDC)
@@ -241,7 +262,7 @@ def moodle2canvas(moodle_fl="moodle.csv", canvas_fl="grades.csv", lab_sec_fl="my
         new_canvas_csv.append(row)
 
     # Now write the new file to $PWD as "<old canvas file name>_update_<date>.csv"
-    new_canvas_fl = canvas_fl.split('.')[0] + '_updated_' + strftime("%d-%m-%Y_%I%M%S") + \
+    new_canvas_fl = canvas_fl.split('.')[0] + '_updated_' + \
             '_with_' + field_to_edit_pretty.replace(' ','') + '.csv'
     new_canvas_writer = csv.writer(open(new_canvas_fl, 'w'), delimiter=',')
     for row in new_canvas_csv:
@@ -279,7 +300,7 @@ if __name__ == '__main__':
 
         subparser.add_argument('--canvas-fl','-c', dest='canvas_fl', nargs='?', default=default_canvas_fl, help='The input file of all grades in canvas format. This file will not be overwritten. Default is: ' + default_canvas_fl)
 
-        subparser.add_argument('--lab-sec-fl','-l', dest='lab_sec_fl', nargs='?', default=default_lab_sec_fl, help='The input csv file of all your lab/lecture sections with first two columns of \'ID, Email\' (with no column headers). Other columns are ignored if they exist. Default is: ' + default_lab_sec_fl)
+        subparser.add_argument('--lab-sec-fl','-l', dest='lab_sec_fl', nargs='?', default=default_lab_sec_fl, help='The input csv file of all your lab/lecture sections with first three columns of \'ID, Email, Name\' (with no column headers). Other columns are ignored if they exist. Default is: ' + default_lab_sec_fl)
 
         subparser.add_argument('--response-fl', '-r', dest='response_fl', nargs='?', default=default_response_fl, help='The repsonse file downloaded from Moodle WITH EVERY COLUMN AFTER QUESTION 1 REMOVED. Can have multiple sections appended. Default is: ' + default_response_fl) 
         
@@ -291,12 +312,14 @@ if __name__ == '__main__':
         
         subparser.add_argument('--add', '-a', dest='add', nargs='?', default=False, type=bool, help='If true, grades are added to current Canvas grades for each student. Useful for combining multiplt project parts into one canvas assignment when partners may be different for different parts.') 
 
+        subparser.add_argument('--log-partners', '-p', dest='log_partners', nargs='?', default=False, type=bool, help='If true, partners are logged in a csv in the Canvas csv directory under the name partners.csv') 
+    
     args = parser.parse_args()
     main_check_groups = False
     if args.subparser == 'group':
         main_check_groups = True    
     moodle2canvas(args.moodle_fl, args.canvas_fl, args.lab_sec_fl, args.response_fl,
          check_groups=main_check_groups, max_moodle_grade=args.max_moodle_grade,
-         style=args.style, grade_cutoff=args.grade_cutoff, add=args.add)
+         style=args.style, grade_cutoff=args.grade_cutoff, add=args.add, lp=args.log_partners)
 
 
